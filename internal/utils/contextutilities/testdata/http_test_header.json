@@ -1,0 +1,108 @@
+[{
+    "Name": "sampled happy path",
+    "Headers": {
+      "X-B3-SpanId": "test_span",
+      "X-B3-TraceId": "test_trace",
+      "X-B3-ParentSpanId": "test_parent",
+      "X-Request-Id": "test_request",
+      "X-B3-Sampled": "1"
+    },
+    "Want": {
+      "RequestID": "test_request",
+      "TraceID": "test_trace",
+      "SpanID": "test_span",
+      "ParentSpanID": "test_parent",
+      "Sampled": true
+    }
+  }, {
+    "Name": "unsampled happy path",
+    "Headers": {
+      "X-B3-SpanId": "dummy_span",
+      "X-B3-TraceId": "dummy_trace",
+      "X-B3-ParentSpanId": "dummy_parent",
+      "X-Request-Id": "dummy_request",
+      "X-B3-Sampled": "0"
+    },
+    "Want": {
+      "RequestID": "dummy_request",
+      "TraceID": "dummy_trace",
+      "SpanID": "dummy_span",
+      "ParentSpanID": "dummy_parent",
+      "Sampled": false
+    }
+  }, {
+    "Name": "legacy sampled happy path",
+    "Headers": {
+      "X-B3-SpanId": "0123456789abcdef",
+      "X-B3-TraceId": "abcdef0123456789",
+      "X-B3-ParentSpanId": "456789abcdef0123",
+      "X-Request-Id": "789abcdef0123456",
+      "X-B3-Sampled": "true"
+    },
+    "Want": {
+      "RequestID": "789abcdef0123456",
+      "TraceID": "abcdef0123456789",
+      "SpanID": "0123456789abcdef",
+      "ParentSpanID": "456789abcdef0123",
+      "Sampled": true
+    }
+  }, {
+    "Name": "legacy unsampled happy path",
+    "Headers": {
+      "X-B3-SpanId": "legacy_span",
+      "X-B3-TraceId": "legacy_trace",
+      "X-B3-ParentSpanId": "legacy_parent",
+      "X-Request-Id": "legacy_request",
+      "X-B3-Sampled": "false"
+    },
+    "Want": {
+      "RequestID": "legacy_request",
+      "TraceID": "legacy_trace",
+      "SpanID": "legacy_span",
+      "ParentSpanID": "legacy_parent",
+      "Sampled": false
+    }
+  },{
+    "Name": "Unsapmled Only trace ID and span ID provided",
+    "Headers": {
+      "X-B3-SpanId": "dummy_span",
+      "X-B3-TraceId": "dummy_trace",
+      "X-B3-ParentSpanId": "",
+      "X-Request-Id": "",
+      "X-B3-Sampled": ""
+    },
+    "Want": {
+      "RequestID": "",
+      "TraceID": "dummy_trace",
+      "SpanID": "dummy_span",
+      "ParentSpanID": "",
+      "Sampled": false
+    }
+  }, {
+    "Name": "Sampled Only trace ID and span ID provided",
+    "Headers": {
+      "X-B3-SpanId": "dummy_span",
+      "X-B3-TraceId": "dummy_trace",
+      "X-B3-ParentSpanId": "",
+      "X-Request-Id": "",
+      "X-B3-Sampled": "1"
+    },
+    "Want": {
+      "RequestID": "",
+      "TraceID": "dummy_trace",
+      "SpanID": "dummy_span",
+      "ParentSpanID": "",
+      "Sampled": true
+    }
+  }, {
+    "Name": "Nil Headers",
+    "Headers": {
+    },
+    "Want": {
+      "RequestID": "",
+      "TraceID": "",
+      "SpanID": "",
+      "ParentSpanID": "",
+      "Sampled": false
+    }
+  }]

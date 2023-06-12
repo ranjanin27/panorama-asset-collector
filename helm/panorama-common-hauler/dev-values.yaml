@@ -1,0 +1,40 @@
+#Override the default values in values.yaml
+
+replicaCount: 1
+
+image:
+  repository: cds-harbor.rtplab.nimblestorage.com/sc-jenkins-preprod/panorama-common-hauler
+  # Overrides the image tag whose default is the chart version.
+  pullPolicy: IfNotPresent
+  tag: latest
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+
+env:
+  logLevel: "debug"
+  pprofEnabled: true
+  # kafka related
+  kafkaBootstrapServers: "devel-platform-kafka.tunnel.svc.cluster.local:9092"
+  kafkaTlsMode: false
+  # proxy related
+  isLocal: true
+  localCluster: true
+  httpProxy: "http://10.79.90.46:443"
+  httpsProxy: "http://10.79.90.46:443"
+  noProxy: "127.0.0.1,localhost,10.0.0.0/8,172.0.0.0/8,192.168.0.0/16,.svc,.cluster.local,.nimblestorage.com"
+  # aws related
+  awsAccessKeyId: ""
+  awsSecretAccessKey: ""
+  awsS3Bucket: ""
+  awsRegion: ""
+  apiURL: "http://test-app.qa.cds.hpe.com"
+
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    memory: 256Mi
+
+affinity: null

@@ -1,0 +1,65 @@
+[{
+  "Name": "sampled happy path",
+  "Headers": {
+    "x-b3-spanid": "test_span",
+    "x-b3-traceid": "test_trace",
+    "x-b3-parentspanid": "test_parent",
+    "x-request-id": "test_request",
+    "x-b3-sampled": "1"
+  },
+  "Want": {
+    "RequestID": "test_request",
+    "TraceID": "test_trace",
+    "SpanID": "test_span",
+    "ParentSpanID": "test_parent",
+    "Sampled": true
+  }
+}, {
+  "Name": "unsampled happy path",
+  "Headers": {
+    "x-b3-spanid": "dummy_span",
+    "x-b3-traceid": "dummy_trace",
+    "x-b3-parentspanid": "dummy_parent",
+    "x-request-id": "dummy_request",
+    "x-b3-sampled": "0"
+  },
+  "Want": {
+    "RequestID": "dummy_request",
+    "TraceID": "dummy_trace",
+    "SpanID": "dummy_span",
+    "ParentSpanID": "dummy_parent",
+    "Sampled": false
+  }
+}, {
+  "Name": "legacy sampled happy path",
+  "Headers": {
+    "x-b3-spanid": "0123456789abcdef",
+    "x-b3-traceid": "abcdef0123456789",
+    "x-b3-parentspanid": "456789abcdef0123",
+    "x-request-id": "789abcdef0123456",
+    "x-b3-sampled": "true"
+  },
+  "Want": {
+    "RequestID": "789abcdef0123456",
+    "TraceID": "abcdef0123456789",
+    "SpanID": "0123456789abcdef",
+    "ParentSpanID": "456789abcdef0123",
+    "Sampled": true
+  }
+}, {
+  "Name": "legacy unsampled happy path",
+  "Headers": {
+    "x-b3-spanid": "legacy_span",
+    "x-b3-traceid": "legacy_trace",
+    "x-b3-parentspanid": "legacy_parent",
+    "x-request-id": "legacy_request",
+    "x-b3-sampled": "false"
+  },
+  "Want": {
+    "RequestID": "legacy_request",
+    "TraceID": "legacy_trace",
+    "SpanID": "legacy_span",
+    "ParentSpanID": "legacy_parent",
+    "Sampled": false
+  }
+}]

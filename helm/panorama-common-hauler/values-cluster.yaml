@@ -1,0 +1,41 @@
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: cds-harbor.rtplab.nimblestorage.com/sc-jenkins-preprod/panorama-common-hauler
+  # Overrides the image tag whose default is the chart version.
+  pullPolicy: Always
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+
+securityContext:
+  readOnlyRootFilesystem: false
+
+env:
+  logLevel: "debug"
+  # kafka related
+  kafkaTlsMode: false
+  pprofEnabled: false
+  # proxy related
+  isLocal: true
+  localCluster: true
+  httpProxy: "http://10.79.90.46:443"
+  httpsProxy: "http://10.79.90.46:443"
+  noProxy: "127.0.0.1,localhost,10.0.0.0/8,172.0.0.0/8,192.168.0.0/16,.svc,.cluster.local,.nimblestorage.com"
+  sourceType: "Fleet"
+  apiURL: "http://cicd-dp-blr.hciiwf.nimblestorage.com"
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 512Mi
+  requests:
+    cpu: 25m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false

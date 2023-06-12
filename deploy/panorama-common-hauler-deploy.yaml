@@ -1,0 +1,103 @@
+# ------------------------------------------------------------------------------
+# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# ------------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: panorama-common-hauler
+  namespace: panorama
+  labels:
+    app: panorama-common-hauler
+spec:
+  strategy:
+    type: Recreate
+  replicas: 1
+  selector:
+    matchLabels:
+      app: panorama-common-hauler
+  template:
+    metadata:
+      labels:
+        app: panorama-common-hauler
+    spec:
+      containers:
+        - name: panorama-common-hauler
+          image: panorama-common-hauler
+          ports:
+            - name: rest
+              containerPort: 8300
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz/liveness
+              port: 8300
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/readiness
+              port: 8300
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          env:
+            - name: HTTP_PORT
+              value: "8300"
+            - name: DEPLOY_MODE
+              value: prod
+            # Env log level
+            - name: LOG_LEVEL
+              value: debug
+            # Env variables for connecting to kafka service
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "devel-platform-kafka.tunnel.svc.cluster.local:9092"
+            - name: KAFKA_SSL_MODE
+              value: "false"
+            - name: HAULER_KAFKA_GROUP_ID
+              value: "panorama.fleet.hauler.consumergroup"
+            - name: KAFKA_TIMEOUT_IN_SECONDS
+              value: "10"
+            - name: HAULER_CONSUMER_KAFKA_TOPIC
+              value: panorama.common.hauler.collection
+            - name: HAULER_PRODUCER_KAFKA_TOPIC
+              value: panorama.hauler.collection.status
+            - name: HAULER_HARMONY_KAFKA_TOPIC
+              value: panorama.common.hdpfilesync
+            # AWS env variables
+            - name: AWS_REGION
+              value: "us-west-2"
+            - name: AWS_ACCESS_KEY_ID
+              value: "test"
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "test"
+            - name: AWS_S3_BUCKET
+              value: "Fleet"
+            - name: SOURCE_TYPE
+              value: "Common"
+            - name: FILE_DOMAIN
+              value: "starburst"
+            - name: RETRY_BACKOFF
+              value: "5s"
+            # Env variables for connecting to Authz service
+            - name: AUTHZ_ENDPOINT
+              value: "10.96.237.100:4770"
+            - name: AUTHZ_DISABLE
+              value: "false"
+            # Env variables for connecting to Fleet Service
+            - name: FLEET_GRPC_ENDPOINT
+              value: "10.96.220.85:5565"
+            - name: FLEET_GRPC_DEVICETYPE1_ENDPOINT
+              value: "10.96.220.85:5565"
+            - name: FLEET_GRPC_DEVICETYPE2_ENDPOINT
+              value: "10.96.220.85:5565"
+            - name: http_proxy
+              value: http://web-proxy.in.hpecorp.net:8080
+            - name: https_proxy
+              value: http://web-proxy.in.hpecorp.net:8080
+            - name: no_proxy
+              value: 127.0.0.1,localhost,.nimblestorage.com,10.0.0.0/8,172.0.0.0/8

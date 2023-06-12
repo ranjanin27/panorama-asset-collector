@@ -1,0 +1,202 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "panorama-common-hauler.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "panorama-common-hauler.labels" . | nindent 4 }}
+spec:
+{{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+      {{- include "panorama-common-hauler.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "panorama-common-hauler.istioLabels" . | nindent 8 }}
+        {{- include "panorama-common-hauler.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ .Values.serviceAccount.name  }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: rest
+              containerPort: {{ .Values.service.httpPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz/liveness
+              port: {{ .Values.service.httpPort }}
+              scheme: HTTP
+            initialDelaySeconds: {{ .Values.healthCheck.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.healthCheck.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.healthCheck.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.healthCheck.livenessProbe.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /healthz/readiness
+              port: {{ .Values.service.httpPort }}
+              scheme: HTTP
+            initialDelaySeconds: {{ .Values.healthCheck.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.healthCheck.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.healthCheck.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.healthCheck.readinessProbe.failureThreshold }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: HTTP_PORT
+              value: {{ .Values.service.httpPort | quote }}
+            - name: DEPLOY_MODE
+              value: {{ .Values.env.deployMode }}
+            - name: LOG_LEVEL
+              value: {{ .Values.env.logLevel }}
+            - name: LOCAL_CLUSTER
+              value: {{ .Values.env.localCluster | quote }}
+            - name: API_URL
+            {{- if (.Values.env.apiURL) }}
+              value: {{ quote .Values.env.apiURL }}
+            {{- else }}
+              valueFrom:
+                configMapKeyRef:
+                  name: "sc-ops-service-discovery"
+                  key: "api_url"
+            {{- end }}
+            - name: REST_CONNECTION_TIMEOUT
+              value: {{ quote .Values.env.restConnectionTimeout }}
+            # Env variables for connecting to kafka service
+            - name: KAFKA_BOOTSTRAP_SERVERS
+            {{- if (.Values.env.kafkaBootstrapServers) }}
+              value: {{ quote .Values.env.kafkaBootstrapServers }}
+            {{- else }}
+              valueFrom:
+                configMapKeyRef:
+                  name: sc-ops-service-discovery
+                  key: bootstrapServers
+            {{- end }}
+            - name: HAULER_KAFKA_GROUP_ID
+              value: {{ quote .Values.env.haulerKafkaGroupId }}
+            - name: KAFKA_TIMEOUT_IN_SECONDS
+              value: {{ quote .Values.env.kafkaTimeoutInSeconds }}
+            - name: KAFKA_TLS_MODE
+              value: {{ quote .Values.env.kafkaTlsMode }}
+            - name: HAULER_CONSUMER_KAFKA_TOPIC
+              value: {{ quote .Values.env.haulerConsumerKafkaTopic }}
+            - name: HAULER_PRODUCER_KAFKA_TOPIC
+              value: {{ quote .Values.env.haulerProducerKafkaTopic }}
+            - name: HAULER_HARMONY_KAFKA_TOPIC
+              value: {{ quote .Values.env.haulerHarmonyKafkaTopic }}
+            # Env variables for aws
+            - name: AWS_REGION
+            {{- if (.Values.env.awsRegion) }}
+              value: {{ quote .Values.env.awsRegion }}
+            {{- else }}
+              valueFrom:
+                configMapKeyRef:
+                  name: sc-ops-service-discovery
+                  key: aws_region
+            {{- end }}
+            - name: AWS_S3_BUCKET
+            {{- if (.Values.env.awsS3Bucket) }}
+              value: {{ quote .Values.env.awsS3Bucket }}
+            {{- else }}
+              valueFrom:
+                configMapKeyRef:
+                  name: sc-ops-service-discovery
+                  key: panorama_harmony_s3_bucket_url
+            {{- end }}
+            {{- if (.Values.env.isLocal) }}
+            - name: HTTP_PROXY
+              value: {{ quote .Values.env.httpProxy }}
+            - name: HTTPS_PROXY
+              value: {{ quote .Values.env.httpsProxy }}
+            - name: NO_PROXY
+              value: {{ quote .Values.env.noProxy }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: awsAccessKeyId
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-secret
+                  key: awsSecretAccessKey
+            {{- else }}
+            - name: AWS_ACCESS_KEY_ID
+              value: {{ quote .Values.env.awsAccessKeyId }}
+            - name: AWS_SECRET_ACCESS_KEY
+              value: {{ quote .Values.env.awsSecretAccessKey }}
+            {{- end }}
+            # Env variables for connecting to Authz service
+            - name: AUTHZ_ENDPOINT
+              value: {{ quote .Values.env.authzEndpoint }}
+            - name: AUTHZ_DISABLE
+              value: {{ quote .Values.env.authzDisable }}
+            # Env variables for connecting to Fleet Service
+            - name: FLEET_GRPC_ENDPOINT
+              value: {{ quote .Values.env.fleetGrpcEndpoint }}
+            - name: FLEET_GRPC_DEVICETYPE1_ENDPOINT
+              value: {{ quote .Values.env.fleetGrpcDeviceType1Endpoint }}
+            - name: FLEET_GRPC_DEVICETYPE2_ENDPOINT
+              value: {{ quote .Values.env.fleetGrpcDeviceType2Endpoint }}
+            - name: USE_CUSTOMER_ID
+              value: {{ quote .Values.env.useCustomerID }}
+            - name: INTERNAL_JWT
+              value: {{ quote .Values.env.internalJwt }}
+            - name: UPDATE_AUTHZ_SERVICE_TOKEN_EXPIRY_TIMEOUT_MINS
+              value: {{ quote .Values.env.updateServiceAuthExpiryTimeoutMins }}
+            - name: PPROF_ENABLED
+              value: {{ quote .Values.env.pprofEnabled }}
+            - name: SOURCE_TYPE
+              value: {{ quote .Values.env.sourceType }}
+            - name: FILE_DOMAIN
+              value: {{ quote .Values.env.fileDomain }}
+            - name: RETRY_BACKOFF
+              value: {{ quote .Values.env.retryBackoff }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          # schedule pods on nodes in different zones
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - {{ include "panorama-common-hauler.name" . }}
+              topologyKey: topology.kubernetes.io/zone
+            weight: 100
+          # if pods in same zone, schedule on different nodes
+          - weight: 90
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - {{ include "panorama-common-hauler.name" . }}
+              topologyKey: kubernetes.io/hostname
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

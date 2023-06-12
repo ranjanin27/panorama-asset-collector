@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.restName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "panorama-common-hauler.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.httpPort }}
+      targetPort: {{ .Values.service.httpPort }}
+      protocol: TCP
+      name: rest
+  selector:
+    {{- include "panorama-common-hauler.selectorLabels" . | nindent 4 }}
