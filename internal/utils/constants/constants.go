@@ -80,5 +80,6 @@ const (
 
 	// Rest
 	RestTimeoutSecs = 60
-	APIURL          = "https://hcipoc-app.qa.cds.hpe.com"
+	// APIURL          = "https://hcipoc-app.qa.cds.hpe.com"
+	APIURL = "http://hci-ninjas-tfk8s-01-ui.hciiwf.nimblestorage.com"
 )

@@ -155,7 +155,7 @@ type CommonHauler struct {
 	Version, PlatformCustomerID, CollectionID, Region, ApplicationCustomerID, ApplicationInstanceID,
 	CollectionTrigger, CollectionStartTime, CollectionEndTime, HaulerType, CollectionType string
 	VirtualMachines, Datastores, ProtectionPolicies,
-	VMProtectionGroups, ProtectedVMs, CSPMachineInstances []interface{}
+	VMProtectionGroups, ProtectedVMs, CSPMachineInstances, ZertoVPGs []interface{}
 	VMBackups   map[string][]interface{}
 	VMSnapshots map[string][]interface{}
 	DSBackups   map[string][]interface{}
@@ -207,7 +207,7 @@ type DeviceType4 struct {
 }
 
 func ConstructCommonJSON(consumerDetails ConsumerDetails, collectionStartTime, haulerType string, virtualmachines,
-	datatstores, protectpolicies, vmprotectgroups, protectedvms, cspmachineinstances []interface{},
+	datatstores, protectpolicies, vmprotectgroups, protectedvms, cspmachineinstances, zertovpgs []interface{},
 	vmbackups, dsbackups map[string][]interface{}, errorMap map[string]map[string]string) CommonHauler {
 	return CommonHauler{
 		Version:               constants.Version,
@@ -226,6 +226,7 @@ func ConstructCommonJSON(consumerDetails ConsumerDetails, collectionStartTime, h
 		ProtectionPolicies:    protectpolicies,
 		VMProtectionGroups:    vmprotectgroups,
 		ProtectedVMs:          protectedvms,
+		ZertoVPGs:             zertovpgs,
 		CSPMachineInstances:   cspmachineinstances,
 		VMBackups:             vmbackups,
 		DSBackups:             dsbackups,

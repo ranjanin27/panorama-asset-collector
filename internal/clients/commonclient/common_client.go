@@ -50,6 +50,7 @@ type ArcusInterface interface {
 	GetDSSnapshots(ctx context.Context, dsId, authHeader string) ([]model.DSSnapshot, error)
 	GetProtectedVMs(ctx context.Context, authHeader string) ([]model.ProtectedVM, error)
 	GetCSPMachineInstances(ctx context.Context, authHeader string) ([]model.CSPMachineInstance, error)
+	GetZertoVPGs(ctx context.Context, authHeader string) ([]model.ZertoVPG, error)
 }
 
 type CommonClient struct {
@@ -533,7 +534,7 @@ func (arcusClient *CommonClient) GetDSSnapshots(ctx context.Context, dsId, authH
 }
 
 func (arcusClient *CommonClient) GetProtectedVMs(ctx context.Context, authHeader string) ([]model.ProtectedVM, error) {
-	baseURL := "/v2/monitoring/protected-vms"
+	baseURL := "/disaster-recovery/v1beta1/protected-vms"
 	var pvms []model.ProtectedVM
 	pageLimit := PageLimit   // set the page limit
 	pageOffset := PageOffset // set the initial page offset
@@ -630,4 +631,54 @@ func (arcusClient *CommonClient) GetCSPMachineInstances(ctx context.Context, aut
 	}
 	// allItems now contains all the astorageSystems from the paginated API
 	return cspmis, nil
+}
+
+func (arcusClient *CommonClient) GetZertoVPGs(ctx context.Context, authHeader string) ([]model.ZertoVPG, error) {
+	baseURL := "/disaster-recovery/v1beta1/virtual-continuous-protection-groups"
+	var zvpgs []model.ZertoVPG
+	pageLimit := PageLimit   // set the page limit
+	pageOffset := PageOffset // set the initial page offset
+
+	for {
+		// create the request with the appropriate URL and query params
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, baseURL, bytes.NewReader(nil))
+		if reqErr != nil {
+			logger.WithContext(ctx).Error(reqErr.Error())
+			return nil, reqErr
+		}
+		q := req.URL.Query()
+		q.Add("limit", fmt.Sprintf("%d", pageLimit))
+		q.Add("offset", fmt.Sprintf("%d", pageOffset))
+		req.URL.RawQuery = q.Encode()
+		req.Close = true
+		// add authorization header to the req
+		if !configs.GetLocalCluster() {
+			req.Header.Add(RestAuthHeader, fmt.Sprintf("Bearer %s", authHeader))
+		}
+		// make the HTTP request
+		resp, _, handleReqErr := arcusClient.HandleRequest(ctx, req, nil)
+		if handleReqErr != nil {
+			logger.WithContext(ctx).Error(handleReqErr.Error())
+			return nil, handleReqErr
+		}
+		// decode the JSON response into a PaginatedResponse object
+		var paginatedResponse model.ZertoVPGs
+		decodeErr := json.NewDecoder(resp.Body).Decode(&paginatedResponse)
+		if decodeErr != nil {
+			logger.WithContext(ctx).Error(decodeErr.Error())
+			resp.Body.Close()
+			return nil, decodeErr
+		}
+		// append the items from the current page to the astoragePools slice
+		zvpgs = append(zvpgs, paginatedResponse.Items...)
+		// break the loop if we have fetched all the astoragePools
+		if len(zvpgs) >= paginatedResponse.Total {
+			resp.Body.Close()
+			break
+		}
+		// update the page offset for the next iteration
+		pageOffset += pageLimit
+	}
+	// allItems now contains all the astorageSystems from the paginated API
+	return zvpgs, nil
 }
