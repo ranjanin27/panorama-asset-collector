@@ -74,6 +74,11 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 	var mainVPGMap = make([]interface{}, 0)
 	var mainPVMMap = make([]interface{}, 0)
 	var mainCSPMIMap = make([]interface{}, 0)
+	var mainPSMap = make([]interface{}, 0)
+	var mainPSGMap = make([]interface{}, 0)
+	var mainSOMap = make([]interface{}, 0)
+	var mainCSPVMap = make([]interface{}, 0)
+	var mainCSPAMap = make([]interface{}, 0)
 	var mainZertoVPGMap = make([]interface{}, 0)
 	var mainVMBackupMap = make(map[string][]interface{})
 	var mainVMSnapshotMap = make(map[string][]interface{})
@@ -82,13 +87,13 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 
 	dc.commonClient.SetCustomerIDForRest(consumerDetails.ApplicationCustomerID)
 
-	// authHeader, authErr := dc.commonClient.GetAuthHeaderForRest()
-	// if authErr != nil {
-	// 	log.WithContext(ctx).Errorf("Auth request failed : %v", authErr)
-	// 	return
-	// }
+	authHeader, authErr := dc.commonClient.GetAuthHeaderForRest()
+	if authErr != nil {
+		log.WithContext(ctx).Errorf("Auth request failed : %v", authErr)
+		return
+	}
 
-	authHeader := "eyJhbGciOiJSUzI1NiIsImtpZCI6IlZ5WXdidVRLZnhwanhHbVVXUmtVbnZ1NU5xdyIsInBpLmF0bSI6IjFmN28ifQ.eyJzY29wZSI6Im9wZW5pZCBwcm9maWxlIGVtYWlsIiwiY2xpZW50X2lkIjoiZGFmZDdmOWYtN2NhYy00MjBhLWI5MTAtZmQyYjc4NDZmZmU0IiwiaXNzIjoiaHR0cHM6Ly9kZXYtc3NvLmNjcy5hcnViYXRoZW5hLmNvbSIsImF1ZCI6ImF1ZCIsImxhc3ROYW1lIjoiaHBlIiwic3ViIjoiaHBlLmF1dGgudGVzdEBnbWFpbC5jb20iLCJ1c2VyX2N0eCI6Ijg5MjJhZmE2NzIzMDExZWJiZTAxY2EzMmQzMmI2Yjc3IiwiYXV0aF9zb3VyY2UiOiJwMTRjIiwiZ2l2ZW5OYW1lIjoiYXV0aHoiLCJpYXQiOjE2MTU5MTAzOTksImV4cCI6MTYxNTkxNzU5OX0.jLniCfT7DbPsZpzVBuYKrUvQ02VFEYhtULAd4NmT1ohPtiy3ybhY1oEjG6GsxMeOvD-6wMNokZqae3Zrt4BJrlENm0G00TF-jcbsKGkRHfqRxdpjS5yifOCySIwykcierd_32O0saTkNKj1FP56NzVKoRa8REdfgHawaFjsMhQ9nwDvftTwiANQqWF9tu1icIFjAuXJV5SVeOKf05ypnYLPtaMn5feTmxbteJh6fhsDx2y9SHDFgx6N8TkIDTu6yTKIFvNo85MdvDnzCFRNj6zzbCGIHPyjiL0hBuXyXQlI9j5FMjC2m7JICM2PSyR1BGD7Y7IULAlf_kaIMST4UNQ"
+	// authHeader := "eyJhbGciOiJSUzI1NiIsImtpZCI6IlZ5WXdidVRLZnhwanhHbVVXUmtVbnZ1NU5xdyIsInBpLmF0bSI6IjFmN28ifQ.eyJzY29wZSI6Im9wZW5pZCBwcm9maWxlIGVtYWlsIiwiY2xpZW50X2lkIjoiZGFmZDdmOWYtN2NhYy00MjBhLWI5MTAtZmQyYjc4NDZmZmU0IiwiaXNzIjoiaHR0cHM6Ly9kZXYtc3NvLmNjcy5hcnViYXRoZW5hLmNvbSIsImF1ZCI6ImF1ZCIsImxhc3ROYW1lIjoiaHBlIiwic3ViIjoiaHBlLmF1dGgudGVzdEBnbWFpbC5jb20iLCJ1c2VyX2N0eCI6Ijg5MjJhZmE2NzIzMDExZWJiZTAxY2EzMmQzMmI2Yjc3IiwiYXV0aF9zb3VyY2UiOiJwMTRjIiwiZ2l2ZW5OYW1lIjoiYXV0aHoiLCJpYXQiOjE2MTU5MTAzOTksImV4cCI6MTYxNTkxNzU5OX0.jLniCfT7DbPsZpzVBuYKrUvQ02VFEYhtULAd4NmT1ohPtiy3ybhY1oEjG6GsxMeOvD-6wMNokZqae3Zrt4BJrlENm0G00TF-jcbsKGkRHfqRxdpjS5yifOCySIwykcierd_32O0saTkNKj1FP56NzVKoRa8REdfgHawaFjsMhQ9nwDvftTwiANQqWF9tu1icIFjAuXJV5SVeOKf05ypnYLPtaMn5feTmxbteJh6fhsDx2y9SHDFgx6N8TkIDTu6yTKIFvNo85MdvDnzCFRNj6zzbCGIHPyjiL0hBuXyXQlI9j5FMjC2m7JICM2PSyR1BGD7Y7IULAlf_kaIMST4UNQ"
 
 	virtualmachines, vErr := dc.commonClient.GetVMs(ctx, authHeader)
 	if vErr != nil {
@@ -113,7 +118,9 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for vb := range vmbackups {
 			mainVMBackupMap[virtualmachines[v].ID] = append(mainVMBackupMap[virtualmachines[v].ID], vmbackups[vb])
 		}
+	}
 
+	for v := range virtualmachines {
 		vmSnapshots, vmsnapErr := dc.commonClient.GetVMSnapshots(ctx, virtualmachines[v].ID, authHeader)
 		if vmsnapErr != nil {
 			log.WithContext(ctx).Errorf("GetVMSnapshots request failed - %v : %v",
@@ -149,7 +156,9 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for db := range dsbackups {
 			mainDSBackupMap[datastores[d].ID] = append(mainDSBackupMap[datastores[d].ID], dsbackups[db])
 		}
+	}
 
+	for d := range datastores {
 		dsSnapshots, dssnapErr := dc.commonClient.GetDSSnapshots(ctx, datastores[d].ID, authHeader)
 		if dssnapErr != nil {
 			log.WithContext(ctx).Errorf("GetDSSnapshots request failed - %v : %v",
@@ -221,7 +230,7 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 	zvpgs, zvpgErr := dc.commonClient.GetZertoVPGs(ctx, authHeader)
 	if zvpgErr != nil {
 		log.WithContext(ctx).Errorf("GetZertoVPGs request failed : %v", zvpgErr)
-		handlers.SetNested(mainErrorMap, "ZertoVPGs", "ZertoVPGs", cspErr.Error())
+		handlers.SetNested(mainErrorMap, "ZertoVPGs", "ZertoVPGs", zvpgErr.Error())
 	}
 
 	if zvpgs != nil {
@@ -232,9 +241,80 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		zvpgs = nil
 	}
 
+	ps, psErr := dc.commonClient.GetProtectionStores(ctx, authHeader)
+	if psErr != nil {
+		log.WithContext(ctx).Errorf("GetProtectionStores request failed : %v", psErr)
+		handlers.SetNested(mainErrorMap, "ProtectionStores", "ProtectionStores", psErr.Error())
+	}
+
+	if ps != nil {
+		log.WithContext(ctx).Infof("GetProtectionStores count - %v", len(ps))
+		for pst := range ps {
+			mainPSMap = append(mainPSMap, ps[pst])
+		}
+		ps = nil
+	}
+
+	psg, psgErr := dc.commonClient.GetProtectionStoreGateways(ctx, authHeader)
+	if psgErr != nil {
+		log.WithContext(ctx).Errorf("GetProtectionStoreGateways request failed : %v", psgErr)
+		handlers.SetNested(mainErrorMap, "ProtectionStoreGateways", "ProtectionStoreGateways", psgErr.Error())
+	}
+
+	if psg != nil {
+		log.WithContext(ctx).Infof("GetProtectionStoreGateways count - %v", len(psg))
+		for psgy := range psg {
+			mainPSGMap = append(mainPSGMap, psg[psgy])
+		}
+		psg = nil
+	}
+
+	sos, sosErr := dc.commonClient.GetStoreonces(ctx, authHeader)
+	if sosErr != nil {
+		log.WithContext(ctx).Errorf("GetStoreonces request failed : %v", sosErr)
+		handlers.SetNested(mainErrorMap, "Storeonces", "Storeonces", sosErr.Error())
+	}
+
+	if sos != nil {
+		log.WithContext(ctx).Infof("GetStoreonces count - %v", len(sos))
+		for so := range sos {
+			mainSOMap = append(mainSOMap, sos[so])
+		}
+		sos = nil
+	}
+
+	cspv, cspvErr := dc.commonClient.GetCSPVolumes(ctx, authHeader)
+	if cspvErr != nil {
+		log.WithContext(ctx).Errorf("GetCSPVolumes request failed : %v", cspvErr)
+		handlers.SetNested(mainErrorMap, "CSPVolumes", "CSPVolumes", cspvErr.Error())
+	}
+
+	if cspv != nil {
+		log.WithContext(ctx).Infof("GetCSPVolumes count - %v", len(cspv))
+		for so := range cspv {
+			mainCSPVMap = append(mainCSPVMap, cspv[so])
+		}
+		cspv = nil
+	}
+
+	cspa, cspaErr := dc.commonClient.GetCSPAccounts(ctx, authHeader)
+	if cspaErr != nil {
+		log.WithContext(ctx).Errorf("GetCSPAccounts request failed : %v", cspaErr)
+		handlers.SetNested(mainErrorMap, "CSPAccounts", "CSPAccounts", cspaErr.Error())
+	}
+
+	if cspa != nil {
+		log.WithContext(ctx).Infof("GetCSPAccounts count - %v", len(cspa))
+		for so := range cspa {
+			mainCSPAMap = append(mainCSPAMap, cspa[so])
+		}
+		cspa = nil
+	}
+
 	var data = handlers.ConstructCommonJSON(consumerDetails, collectionStartTime, Common,
 		mainVMMap, mainDSMap, mainPPMap, mainVPGMap, mainPVMMap, mainCSPMIMap, mainZertoVPGMap,
-		mainVMBackupMap, mainDSBackupMap, mainErrorMap)
+		mainPSMap, mainPSGMap, mainSOMap, mainCSPAMap, mainCSPVMap, mainVMBackupMap, mainDSBackupMap,
+		mainVMSnapshotMap, mainDSSnapshotMap, mainErrorMap)
 	file, _ := json.MarshalIndent(data, "", " ")
 	// _ = ioutil.WriteFile("test.json", file, 0644)
 	handlers.UploadToServer(ctx, file, consumerDetails, Common, mainErrorMap, schedulerProducer,

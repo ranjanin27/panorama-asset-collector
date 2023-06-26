@@ -51,6 +51,11 @@ type ArcusInterface interface {
 	GetProtectedVMs(ctx context.Context, authHeader string) ([]model.ProtectedVM, error)
 	GetCSPMachineInstances(ctx context.Context, authHeader string) ([]model.CSPMachineInstance, error)
 	GetZertoVPGs(ctx context.Context, authHeader string) ([]model.ZertoVPG, error)
+	GetProtectionStores(ctx context.Context, authHeader string) ([]model.ProtectionStore, error)
+	GetProtectionStoreGateways(ctx context.Context, authHeader string) ([]model.ProtectionStoreGateway, error)
+	GetStoreonces(ctx context.Context, authHeader string) ([]model.Storeonce, error)
+	GetCSPAccounts(ctx context.Context, authHeader string) ([]model.CSPAccount, error)
+	GetCSPVolumes(ctx context.Context, authHeader string) ([]model.CSPVolume, error)
 }
 
 type CommonClient struct {
@@ -98,7 +103,10 @@ func (arcusClient *CommonClient) SetCustomerIDForRest(customerID string) {
 func (arcusClient *CommonClient) GetAuthHeaderForRest() (string, error) {
 	urlStr := "https://sso.common.cloud.hpe.com/as/token.oauth2"
 
-	payload := strings.NewReader("grant_type=client_credentials&client_id=0d6f9b5d-c528-4826-9340-f21a6500d960&client_secret=9a2b76567aef11edb5397eb97d380c5e")
+	// HCIPOC account
+	//payload := strings.NewReader("grant_type=client_credentials&client_id=0d6f9b5d-c528-4826-9340-f21a6500d960&client_secret=9a2b76567aef11edb5397eb97d380c5e")
+	// SCDEV01 account
+	payload := strings.NewReader("grant_type=client_credentials&client_id=7fb4cf66-af63-4953-94c4-12d9e63b081c&client_secret=2d6939bc142e11ee9ad40667a7649451")
 
 	req, err := http.NewRequest("POST", urlStr, payload)
 	if err != nil {
@@ -681,4 +689,239 @@ func (arcusClient *CommonClient) GetZertoVPGs(ctx context.Context, authHeader st
 	}
 	// allItems now contains all the astorageSystems from the paginated API
 	return zvpgs, nil
+}
+
+func (arcusClient *CommonClient) GetProtectionStores(ctx context.Context, authHeader string) ([]model.ProtectionStore, error) {
+	baseURL := "/api/v1/protection-stores"
+	var ps []model.ProtectionStore
+	pageLimit := PageLimit   // set the page limit
+	pageOffset := PageOffset // set the initial page offset
+
+	for {
+		// create the request with the appropriate URL and query params
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, baseURL, bytes.NewReader(nil))
+		if reqErr != nil {
+			logger.WithContext(ctx).Error(reqErr.Error())
+			return nil, reqErr
+		}
+		q := req.URL.Query()
+		q.Add("limit", fmt.Sprintf("%d", pageLimit))
+		q.Add("offset", fmt.Sprintf("%d", pageOffset))
+		req.URL.RawQuery = q.Encode()
+		req.Close = true
+		// add authorization header to the req
+		if !configs.GetLocalCluster() {
+			req.Header.Add(RestAuthHeader, fmt.Sprintf("Bearer %s", authHeader))
+		}
+		// make the HTTP request
+		resp, _, handleReqErr := arcusClient.HandleRequest(ctx, req, nil)
+		if handleReqErr != nil {
+			logger.WithContext(ctx).Error(handleReqErr.Error())
+			return nil, handleReqErr
+		}
+		// decode the JSON response into a PaginatedResponse object
+		var paginatedResponse model.ProtectionStores
+		decodeErr := json.NewDecoder(resp.Body).Decode(&paginatedResponse)
+		if decodeErr != nil {
+			logger.WithContext(ctx).Error(decodeErr.Error())
+			resp.Body.Close()
+			return nil, decodeErr
+		}
+		// append the items from the current page to the astoragePools slice
+		ps = append(ps, paginatedResponse.Items...)
+		// break the loop if we have fetched all the astoragePools
+		if len(ps) >= paginatedResponse.Total {
+			resp.Body.Close()
+			break
+		}
+		// update the page offset for the next iteration
+		pageOffset += pageLimit
+	}
+	// allItems now contains all the astorageSystems from the paginated API
+	return ps, nil
+}
+
+func (arcusClient *CommonClient) GetProtectionStoreGateways(ctx context.Context, authHeader string) ([]model.ProtectionStoreGateway, error) {
+	baseURL := "/api/v1/protection-store-gateways"
+	var psgs []model.ProtectionStoreGateway
+
+	// create the request with the appropriate URL and query params
+	req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, baseURL, bytes.NewReader(nil))
+	if reqErr != nil {
+		logger.WithContext(ctx).Error(reqErr.Error())
+		return nil, reqErr
+	}
+	req.Close = true
+	// add authorization header to the req
+	if !configs.GetLocalCluster() {
+		req.Header.Add(RestAuthHeader, fmt.Sprintf("Bearer %s", authHeader))
+	}
+	// make the HTTP request
+	resp, _, handleReqErr := arcusClient.HandleRequest(ctx, req, nil)
+	if handleReqErr != nil {
+		logger.WithContext(ctx).Error(handleReqErr.Error())
+		return nil, handleReqErr
+	}
+	// decode the JSON response into a PaginatedResponse object
+	var paginatedResponse model.ProtectionStoreGateways
+	decodeErr := json.NewDecoder(resp.Body).Decode(&paginatedResponse)
+	if decodeErr != nil {
+		logger.WithContext(ctx).Error(decodeErr.Error())
+		resp.Body.Close()
+		return nil, decodeErr
+	}
+	// append the items from the current page to the astoragePools slice
+	psgs = append(psgs, paginatedResponse.Items...)
+	// allItems now contains all the astorageSystems from the paginated API
+	return psgs, nil
+}
+
+func (arcusClient *CommonClient) GetStoreonces(ctx context.Context, authHeader string) ([]model.Storeonce, error) {
+	baseURL := "/api/v1/storeonces"
+	var sos []model.Storeonce
+	pageLimit := PageLimit   // set the page limit
+	pageOffset := PageOffset // set the initial page offset
+
+	for {
+		// create the request with the appropriate URL and query params
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, baseURL, bytes.NewReader(nil))
+		if reqErr != nil {
+			logger.WithContext(ctx).Error(reqErr.Error())
+			return nil, reqErr
+		}
+		q := req.URL.Query()
+		q.Add("limit", fmt.Sprintf("%d", pageLimit))
+		q.Add("offset", fmt.Sprintf("%d", pageOffset))
+		req.URL.RawQuery = q.Encode()
+		req.Close = true
+		// add authorization header to the req
+		if !configs.GetLocalCluster() {
+			req.Header.Add(RestAuthHeader, fmt.Sprintf("Bearer %s", authHeader))
+		}
+		// make the HTTP request
+		resp, _, handleReqErr := arcusClient.HandleRequest(ctx, req, nil)
+		if handleReqErr != nil {
+			logger.WithContext(ctx).Error(handleReqErr.Error())
+			return nil, handleReqErr
+		}
+		// decode the JSON response into a PaginatedResponse object
+		var paginatedResponse model.Storeonces
+		decodeErr := json.NewDecoder(resp.Body).Decode(&paginatedResponse)
+		if decodeErr != nil {
+			logger.WithContext(ctx).Error(decodeErr.Error())
+			resp.Body.Close()
+			return nil, decodeErr
+		}
+		// append the items from the current page to the astoragePools slice
+		sos = append(sos, paginatedResponse.Items...)
+		// break the loop if we have fetched all the astoragePools
+		if len(sos) >= paginatedResponse.Total {
+			resp.Body.Close()
+			break
+		}
+		// update the page offset for the next iteration
+		pageOffset += pageLimit
+	}
+	// allItems now contains all the astorageSystems from the paginated API
+	return sos, nil
+}
+
+func (arcusClient *CommonClient) GetCSPAccounts(ctx context.Context, authHeader string) ([]model.CSPAccount, error) {
+	baseURL := "/api/v1/csp-accounts"
+	var cspa []model.CSPAccount
+	pageLimit := PageLimit   // set the page limit
+	pageOffset := PageOffset // set the initial page offset
+
+	for {
+		// create the request with the appropriate URL and query params
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, baseURL, bytes.NewReader(nil))
+		if reqErr != nil {
+			logger.WithContext(ctx).Error(reqErr.Error())
+			return nil, reqErr
+		}
+		q := req.URL.Query()
+		q.Add("limit", fmt.Sprintf("%d", pageLimit))
+		q.Add("offset", fmt.Sprintf("%d", pageOffset))
+		req.URL.RawQuery = q.Encode()
+		req.Close = true
+		// add authorization header to the req
+		if !configs.GetLocalCluster() {
+			req.Header.Add(RestAuthHeader, fmt.Sprintf("Bearer %s", authHeader))
+		}
+		// make the HTTP request
+		resp, _, handleReqErr := arcusClient.HandleRequest(ctx, req, nil)
+		if handleReqErr != nil {
+			logger.WithContext(ctx).Error(handleReqErr.Error())
+			return nil, handleReqErr
+		}
+		// decode the JSON response into a PaginatedResponse object
+		var paginatedResponse model.CSPAccounts
+		decodeErr := json.NewDecoder(resp.Body).Decode(&paginatedResponse)
+		if decodeErr != nil {
+			logger.WithContext(ctx).Error(decodeErr.Error())
+			resp.Body.Close()
+			return nil, decodeErr
+		}
+		// append the items from the current page to the astoragePools slice
+		cspa = append(cspa, paginatedResponse.Items...)
+		// break the loop if we have fetched all the astoragePools
+		if len(cspa) >= paginatedResponse.Total {
+			resp.Body.Close()
+			break
+		}
+		// update the page offset for the next iteration
+		pageOffset += pageLimit
+	}
+	// allItems now contains all the astorageSystems from the paginated API
+	return cspa, nil
+}
+
+func (arcusClient *CommonClient) GetCSPVolumes(ctx context.Context, authHeader string) ([]model.CSPVolume, error) {
+	baseURL := "/api/v1/csp-volumes"
+	var cspv []model.CSPVolume
+	pageLimit := PageLimit   // set the page limit
+	pageOffset := PageOffset // set the initial page offset
+
+	for {
+		// create the request with the appropriate URL and query params
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, baseURL, bytes.NewReader(nil))
+		if reqErr != nil {
+			logger.WithContext(ctx).Error(reqErr.Error())
+			return nil, reqErr
+		}
+		q := req.URL.Query()
+		q.Add("limit", fmt.Sprintf("%d", pageLimit))
+		q.Add("offset", fmt.Sprintf("%d", pageOffset))
+		req.URL.RawQuery = q.Encode()
+		req.Close = true
+		// add authorization header to the req
+		if !configs.GetLocalCluster() {
+			req.Header.Add(RestAuthHeader, fmt.Sprintf("Bearer %s", authHeader))
+		}
+		// make the HTTP request
+		resp, _, handleReqErr := arcusClient.HandleRequest(ctx, req, nil)
+		if handleReqErr != nil {
+			logger.WithContext(ctx).Error(handleReqErr.Error())
+			return nil, handleReqErr
+		}
+		// decode the JSON response into a PaginatedResponse object
+		var paginatedResponse model.CSPVolumes
+		decodeErr := json.NewDecoder(resp.Body).Decode(&paginatedResponse)
+		if decodeErr != nil {
+			logger.WithContext(ctx).Error(decodeErr.Error())
+			resp.Body.Close()
+			return nil, decodeErr
+		}
+		// append the items from the current page to the astoragePools slice
+		cspv = append(cspv, paginatedResponse.Items...)
+		// break the loop if we have fetched all the astoragePools
+		if len(cspv) >= paginatedResponse.Total {
+			resp.Body.Close()
+			break
+		}
+		// update the page offset for the next iteration
+		pageOffset += pageLimit
+	}
+	// allItems now contains all the astorageSystems from the paginated API
+	return cspv, nil
 }

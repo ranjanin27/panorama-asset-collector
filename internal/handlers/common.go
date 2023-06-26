@@ -154,8 +154,8 @@ type EOCIndicator struct {
 type CommonHauler struct {
 	Version, PlatformCustomerID, CollectionID, Region, ApplicationCustomerID, ApplicationInstanceID,
 	CollectionTrigger, CollectionStartTime, CollectionEndTime, HaulerType, CollectionType string
-	VirtualMachines, Datastores, ProtectionPolicies,
-	VMProtectionGroups, ProtectedVMs, CSPMachineInstances, ZertoVPGs []interface{}
+	VirtualMachines, Datastores, ProtectionPolicies, VMProtectionGroups, ProtectedVMs, CSPMachineInstances,
+	ProtectionStores, ProtectionStoreGateways, Storeonces, ZertoVPGs, CSPAccounts, CSPVolumes []interface{}
 	VMBackups   map[string][]interface{}
 	VMSnapshots map[string][]interface{}
 	DSBackups   map[string][]interface{}
@@ -207,30 +207,38 @@ type DeviceType4 struct {
 }
 
 func ConstructCommonJSON(consumerDetails ConsumerDetails, collectionStartTime, haulerType string, virtualmachines,
-	datatstores, protectpolicies, vmprotectgroups, protectedvms, cspmachineinstances, zertovpgs []interface{},
-	vmbackups, dsbackups map[string][]interface{}, errorMap map[string]map[string]string) CommonHauler {
+	datatstores, protectpolicies, vmprotectgroups, protectedvms, cspmachineinstances, zertovpgs, protectionstores,
+	protectstoregtwys, storeonces, cspaccounts, cspvolumes []interface{}, vmbackups, dsbackups, vmsnapshots, dssnapshots map[string][]interface{},
+	errorMap map[string]map[string]string) CommonHauler {
 	return CommonHauler{
-		Version:               constants.Version,
-		PlatformCustomerID:    consumerDetails.PlatformCustomerID,
-		CollectionID:          consumerDetails.CollectionID,
-		CollectionStartTime:   collectionStartTime,
-		CollectionEndTime:     time.Now().UTC().String(),
-		CollectionTrigger:     consumerDetails.CollectionTrigger,
-		Region:                consumerDetails.Region,
-		ApplicationCustomerID: consumerDetails.ApplicationCustomerID,
-		ApplicationInstanceID: consumerDetails.ApplicationInstanceID,
-		HaulerType:            haulerType,
-		CollectionType:        consumerDetails.CollectionType,
-		VirtualMachines:       virtualmachines,
-		Datastores:            datatstores,
-		ProtectionPolicies:    protectpolicies,
-		VMProtectionGroups:    vmprotectgroups,
-		ProtectedVMs:          protectedvms,
-		ZertoVPGs:             zertovpgs,
-		CSPMachineInstances:   cspmachineinstances,
-		VMBackups:             vmbackups,
-		DSBackups:             dsbackups,
-		Error:                 errorMap,
+		Version:                 constants.Version,
+		PlatformCustomerID:      consumerDetails.PlatformCustomerID,
+		CollectionID:            consumerDetails.CollectionID,
+		CollectionStartTime:     collectionStartTime,
+		CollectionEndTime:       time.Now().UTC().String(),
+		CollectionTrigger:       consumerDetails.CollectionTrigger,
+		Region:                  consumerDetails.Region,
+		ApplicationCustomerID:   consumerDetails.ApplicationCustomerID,
+		ApplicationInstanceID:   consumerDetails.ApplicationInstanceID,
+		HaulerType:              haulerType,
+		CollectionType:          consumerDetails.CollectionType,
+		VirtualMachines:         virtualmachines,
+		Datastores:              datatstores,
+		ProtectionPolicies:      protectpolicies,
+		VMProtectionGroups:      vmprotectgroups,
+		ProtectedVMs:            protectedvms,
+		ZertoVPGs:               zertovpgs,
+		CSPMachineInstances:     cspmachineinstances,
+		VMBackups:               vmbackups,
+		DSBackups:               dsbackups,
+		ProtectionStores:        protectionstores,
+		ProtectionStoreGateways: protectstoregtwys,
+		Storeonces:              storeonces,
+		CSPAccounts:             cspaccounts,
+		CSPVolumes:              cspvolumes,
+		VMSnapshots:             vmsnapshots,
+		DSSnapshots:             dssnapshots,
+		Error:                   errorMap,
 	}
 }
 

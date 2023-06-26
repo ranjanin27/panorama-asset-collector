@@ -29,9 +29,9 @@ type RestClient struct {
 
 func NewRestClient(hostName string, timeout time.Duration) (RestInterface, error) {
 	tr := &http.Transport{
-		// Proxy: func(req *http.Request) (*url.URL, error) {
-		// 	return url.Parse("http://web-proxy.corp.hpecorp.net:8080")
-		// },
+		Proxy: func(req *http.Request) (*url.URL, error) {
+			return url.Parse("http://web-proxy.corp.hpecorp.net:8080")
+		},
 		TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12},
 	}
 	client := &http.Client{Transport: tr, Timeout: timeout}
