@@ -1,14 +1,19 @@
-// (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+// (C) Copyright 2023 Hewlett Packard Enterprise Development LP
 
 package services
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
+	"github.com/rs/xid"
 	"github.hpe.com/nimble-dcs/panorama-common-hauler/internal/clients/commonclient"
 	"github.hpe.com/nimble-dcs/panorama-common-hauler/internal/handlers"
+	"github.hpe.com/nimble-dcs/panorama-common-hauler/internal/utils/configs"
 	"github.hpe.com/nimble-dcs/panorama-common-hauler/internal/utils/kafka/producer"
 	"github.hpe.com/nimble-dcs/panorama-common-hauler/internal/utils/logging"
 )
@@ -43,6 +48,9 @@ const (
 	Clones                = "Clones"
 	DeviceType4           = "deviceType4"
 	Common                = "Common"
+	jsonExt               = ".json"
+	PARTITIONKEY          = "partitionKey"
+	equalExt              = "="
 )
 
 type dataCollectionService struct {
@@ -63,10 +71,29 @@ type DataCollectionServiceInterface interface {
 		schedulerProducer producer.Producer, harmonyProducer producer.Producer)
 }
 
+var UploadToS3 = func(ctx context.Context, jsonContent *[]byte, bucketName, awsS3Region, awsAccessKeyID,
+	awsSecretAccessKey string, uploadType UploadType) (string, int, error) {
+	log.Debugf("bucketName: %v awsS3Region %v awsAccessKeyID %v awsSecretAccessKey %v uploadType %v\n",
+		bucketName, awsS3Region, awsAccessKeyID, awsSecretAccessKey, uploadType)
+	keyname, filesize, err := UploadToAwsS3(ctx, jsonContent, bucketName, awsS3Region, awsAccessKeyID,
+		awsSecretAccessKey, uploadType)
+	return keyname, filesize, err
+}
+
+func ConstructS3Object() string {
+	now := time.Now().UTC()
+	nows := fmt.Sprintf("%v", now)
+	word1 := strings.Split(string(nows), " ")
+	word2 := strings.Split(word1[1], ":")
+	partitionKey := fmt.Sprintf("%v", word1[0]+"-"+word2[0]+"-"+word2[1])
+	collectionID := xid.New().String()
+	return PARTITIONKEY + equalExt + partitionKey + "/" + collectionID + jsonExt
+}
+
 //nolint:funlen,gocyclo,ineffassign // Code can be lengthy without a need for decomposition
 func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, consumerDetails handlers.ConsumerDetails,
 	schedulerProducer producer.Producer, harmonyProducer producer.Producer) {
-	var collectionStartTime = time.Now().UTC().String()
+	//var collectionStartTime = time.Now().UTC().String()
 	var mainErrorMap = make(map[string]map[string]string)
 	var mainVMMap = make([]interface{}, 0)
 	var mainDSMap = make([]interface{}, 0)
@@ -95,6 +122,8 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 
 	// authHeader := "eyJhbGciOiJSUzI1NiIsImtpZCI6IlZ5WXdidVRLZnhwanhHbVVXUmtVbnZ1NU5xdyIsInBpLmF0bSI6IjFmN28ifQ.eyJzY29wZSI6Im9wZW5pZCBwcm9maWxlIGVtYWlsIiwiY2xpZW50X2lkIjoiZGFmZDdmOWYtN2NhYy00MjBhLWI5MTAtZmQyYjc4NDZmZmU0IiwiaXNzIjoiaHR0cHM6Ly9kZXYtc3NvLmNjcy5hcnViYXRoZW5hLmNvbSIsImF1ZCI6ImF1ZCIsImxhc3ROYW1lIjoiaHBlIiwic3ViIjoiaHBlLmF1dGgudGVzdEBnbWFpbC5jb20iLCJ1c2VyX2N0eCI6Ijg5MjJhZmE2NzIzMDExZWJiZTAxY2EzMmQzMmI2Yjc3IiwiYXV0aF9zb3VyY2UiOiJwMTRjIiwiZ2l2ZW5OYW1lIjoiYXV0aHoiLCJpYXQiOjE2MTU5MTAzOTksImV4cCI6MTYxNTkxNzU5OX0.jLniCfT7DbPsZpzVBuYKrUvQ02VFEYhtULAd4NmT1ohPtiy3ybhY1oEjG6GsxMeOvD-6wMNokZqae3Zrt4BJrlENm0G00TF-jcbsKGkRHfqRxdpjS5yifOCySIwykcierd_32O0saTkNKj1FP56NzVKoRa8REdfgHawaFjsMhQ9nwDvftTwiANQqWF9tu1icIFjAuXJV5SVeOKf05ypnYLPtaMn5feTmxbteJh6fhsDx2y9SHDFgx6N8TkIDTu6yTKIFvNo85MdvDnzCFRNj6zzbCGIHPyjiL0hBuXyXQlI9j5FMjC2m7JICM2PSyR1BGD7Y7IULAlf_kaIMST4UNQ"
 
+	pKey := ConstructS3Object()
+
 	virtualmachines, vErr := dc.commonClient.GetVMs(ctx, authHeader)
 	if vErr != nil {
 		log.WithContext(ctx).Errorf("GetVMs request failed : %v", vErr)
@@ -106,6 +135,15 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for v := range virtualmachines {
 			mainVMMap = append(mainVMMap, virtualmachines[v])
 		}
+		u, err := json.Marshal(mainVMMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./vmsTest", u, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &u, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/VM/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 	}
 
 	for v := range virtualmachines {
@@ -119,6 +157,15 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 			mainVMBackupMap[virtualmachines[v].ID] = append(mainVMBackupMap[virtualmachines[v].ID], vmbackups[vb])
 		}
 	}
+	bkup, err := json.Marshal(mainVMBackupMap)
+	if err != nil {
+		log.WithContext(ctx).Errorf("err is %v", err)
+	}
+	err = os.WriteFile("./vmBackups", bkup, 0644)
+	log.WithContext(ctx).Errorf("file write err is %v", err)
+
+	UploadToS3(ctx, &bkup, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+		configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/VMBK/"+pKey))
 
 	for v := range virtualmachines {
 		vmSnapshots, vmsnapErr := dc.commonClient.GetVMSnapshots(ctx, virtualmachines[v].ID, authHeader)
@@ -131,6 +178,15 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 			mainVMSnapshotMap[virtualmachines[v].ID] = append(mainVMSnapshotMap[virtualmachines[v].ID], vmSnapshots[vs])
 		}
 	}
+	snap, err := json.Marshal(mainVMSnapshotMap)
+	if err != nil {
+		log.WithContext(ctx).Errorf("err is %v", err)
+	}
+	err = os.WriteFile("./vmSnapshots", snap, 0644)
+	log.WithContext(ctx).Errorf("file write err is %v", err)
+	key, filesize, err := UploadToS3(ctx, &snap, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+		configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/VMSNP/"+pKey))
+	log.WithContext(ctx).Infof("Err = %v, ke:y= %v, filesize = %v", err, key, filesize)
 	virtualmachines = nil
 
 	datastores, dErr := dc.commonClient.GetDatastores(ctx, authHeader)
@@ -144,6 +200,15 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for d := range datastores {
 			mainDSMap = append(mainDSMap, datastores[d])
 		}
+		u, err := json.Marshal(mainDSMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./datastoreTest", u, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &u, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/DS/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 	}
 
 	for d := range datastores {
@@ -157,6 +222,15 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 			mainDSBackupMap[datastores[d].ID] = append(mainDSBackupMap[datastores[d].ID], dsbackups[db])
 		}
 	}
+	u, err := json.Marshal(mainDSBackupMap)
+	if err != nil {
+		log.WithContext(ctx).Errorf("err is %v", err)
+	}
+	err = os.WriteFile("./datastoreBKTest", u, 0644)
+	log.WithContext(ctx).Errorf("file write err is %v", err)
+	key, filesize, err = UploadToS3(ctx, &u, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+		configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/DSBK/"+pKey))
+	log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 
 	for d := range datastores {
 		dsSnapshots, dssnapErr := dc.commonClient.GetDSSnapshots(ctx, datastores[d].ID, authHeader)
@@ -169,8 +243,17 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 			mainDSSnapshotMap[datastores[d].ID] = append(mainDSSnapshotMap[datastores[d].ID], dsSnapshots[ds])
 		}
 	}
-	datastores = nil
+	dssnap, err := json.Marshal(mainDSSnapshotMap)
+	if err != nil {
+		log.WithContext(ctx).Errorf("err is %v", err)
+	}
+	err = os.WriteFile("./datastoreSnapshotTest", dssnap, 0644)
+	log.WithContext(ctx).Errorf("file write err is %v", err)
+	key, filesize, err = UploadToS3(ctx, &dssnap, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+		configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/DSSNP/"+pKey))
+	log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 
+	datastores = nil
 	protectionpolicies, pErr := dc.commonClient.GetProtectionPolicies(ctx, authHeader)
 	if pErr != nil {
 		log.WithContext(ctx).Errorf("GetProtectionPolicies request failed : %v", pErr)
@@ -182,6 +265,16 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for p := range protectionpolicies {
 			mainPPMap = append(mainPPMap, protectionpolicies[p])
 		}
+		pp, err := json.Marshal(mainPPMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./ppTest", pp, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &pp, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/PP/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
+
 		protectionpolicies = nil
 	}
 
@@ -196,6 +289,16 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for v := range vpg {
 			mainVPGMap = append(mainVPGMap, vpg[v])
 		}
+		vpg, err := json.Marshal(mainVPGMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./vpgTest", vpg, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &vpg, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/VMPG/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
+
 		vpg = nil
 	}
 
@@ -210,6 +313,16 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for p := range pvms {
 			mainPVMMap = append(mainPVMMap, pvms[p])
 		}
+		pvm, err := json.Marshal(mainPVMMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./pvmTest", pvm, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &pvm, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/PVM/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
+
 		pvms = nil
 	}
 
@@ -224,6 +337,15 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for csp := range cspMI {
 			mainCSPMIMap = append(mainCSPMIMap, cspMI[csp])
 		}
+		csp, err := json.Marshal(mainCSPMIMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./pvmTest", csp, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &csp, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/EC2/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 		cspMI = nil
 	}
 
@@ -238,6 +360,15 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for zvpg := range zvpgs {
 			mainZertoVPGMap = append(mainZertoVPGMap, zvpgs[zvpg])
 		}
+		zmap, err := json.Marshal(mainZertoVPGMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./pvmTest", zmap, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &zmap, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/ZERTO/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 		zvpgs = nil
 	}
 
@@ -252,6 +383,15 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for pst := range ps {
 			mainPSMap = append(mainPSMap, ps[pst])
 		}
+		u, err := json.Marshal(mainPSMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./psTest", u, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &u, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/PS/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 		ps = nil
 	}
 
@@ -266,6 +406,15 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for psgy := range psg {
 			mainPSGMap = append(mainPSGMap, psg[psgy])
 		}
+		m, err := json.Marshal(mainPSGMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./psmTest", m, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &m, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/PSG/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 		psg = nil
 	}
 
@@ -280,6 +429,15 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for so := range sos {
 			mainSOMap = append(mainSOMap, sos[so])
 		}
+		sMap, err := json.Marshal(mainSOMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./sosTest", sMap, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &sMap, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/STOREONCE/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 		sos = nil
 	}
 
@@ -294,6 +452,15 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for so := range cspv {
 			mainCSPVMap = append(mainCSPVMap, cspv[so])
 		}
+		sMap, err := json.Marshal(mainCSPVMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./cspTest", sMap, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &sMap, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/EBS/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 		cspv = nil
 	}
 
@@ -308,16 +475,16 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		for so := range cspa {
 			mainCSPAMap = append(mainCSPAMap, cspa[so])
 		}
+		cspMap, err := json.Marshal(mainCSPAMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./cspTest", cspMap, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &cspMap, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/ACC/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 		cspa = nil
 	}
 
-	var data = handlers.ConstructCommonJSON(consumerDetails, collectionStartTime, Common,
-		mainVMMap, mainDSMap, mainPPMap, mainVPGMap, mainPVMMap, mainCSPMIMap, mainZertoVPGMap,
-		mainPSMap, mainPSGMap, mainSOMap, mainCSPAMap, mainCSPVMap, mainVMBackupMap, mainDSBackupMap,
-		mainVMSnapshotMap, mainDSSnapshotMap, mainErrorMap)
-	file, _ := json.MarshalIndent(data, "", " ")
-	// _ = ioutil.WriteFile("test.json", file, 0644)
-	handlers.UploadToServer(ctx, file, consumerDetails, Common, mainErrorMap, schedulerProducer,
-		harmonyProducer)
-	file = nil
 }
