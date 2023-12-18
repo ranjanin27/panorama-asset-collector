@@ -113,9 +113,9 @@ func dispatchMessage(ctx context.Context, msg kafka.Message, schedulerProducer p
 	// var collectionStartTime = time.Now().UTC().String()
 	// var errorMapEOC = make(map[string]map[string]string)
 
-	arcusClient, arcusClientErr := commonclient.NewCommonClient(grpcContext)
-	if arcusClient == nil {
-		logger.WithContext(grpcContext).Errorf("Client initiation failed %v", arcusClientErr)
+	assetClient, assetClientErr := commonclient.NewCommonClient(grpcContext)
+	if assetClient == nil {
+		logger.WithContext(grpcContext).Errorf("Client initiation failed %v", assetClientErr)
 		// handlers.SetNested(errorMap, handlers.RESTError, handlers.RESTError, arcusClientErr.Error())
 		// var data = handlers.ConstructFailedCollectionJSON(*consumerDetails, collectionStartTime,
 		// 	handlers.UnknownDeviceType, handlers.ArcusHaulertype, errorMap)
@@ -131,7 +131,7 @@ func dispatchMessage(ctx context.Context, msg kafka.Message, schedulerProducer p
 		return
 	}
 
-	dataCollectionService := services.NewDataCollectionService(grpcContext, arcusClient)
+	dataCollectionService := services.NewDataCollectionService(grpcContext, assetClient)
 	if dataCollectionService != nil {
 		logger.WithContext(grpcContext).Infof("Collection started for collectionID: %s", consumerDetails.CollectionID)
 		dataCollectionService.CollectDeviceInformation(grpcContext, *consumerDetails, schedulerProducer, harmonyProducer)

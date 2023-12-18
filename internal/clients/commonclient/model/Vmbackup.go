@@ -47,5 +47,6 @@ type VMBackup struct {
 		Type        string `json:"type"`
 	} `json:"storageSystemInfo"`
 	Type      string `json:"type"`
+	SourceID  string `json:"sourceID"`
 	UpdatedAt string `json:"updatedAt"`
 }

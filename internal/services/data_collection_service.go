@@ -54,12 +54,12 @@ const (
 )
 
 type dataCollectionService struct {
-	commonClient commonclient.ArcusInterface
+	commonClient commonclient.AssetInterface
 	ctx          context.Context
 }
 
 func NewDataCollectionService(ctx context.Context,
-	aClient commonclient.ArcusInterface) DataCollectionServiceInterface {
+	aClient commonclient.AssetInterface) DataCollectionServiceInterface {
 	return &dataCollectionService{
 		commonClient: aClient,
 		ctx:          ctx,
@@ -103,14 +103,21 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 	var mainCSPMIMap = make([]interface{}, 0)
 	var mainPSMap = make([]interface{}, 0)
 	var mainPSGMap = make([]interface{}, 0)
+	var mainDataOrchestratorMap = make([]interface{}, 0)
 	var mainSOMap = make([]interface{}, 0)
 	var mainCSPVMap = make([]interface{}, 0)
 	var mainCSPAMap = make([]interface{}, 0)
 	var mainZertoVPGMap = make([]interface{}, 0)
-	var mainVMBackupMap = make(map[string][]interface{})
+	var mainVMBackupMap = make([]interface{}, 0)
 	var mainVMSnapshotMap = make(map[string][]interface{})
-	var mainDSBackupMap = make(map[string][]interface{})
+	var mainDSBackupMap = make([]interface{}, 0)
 	var mainDSSnapshotMap = make(map[string][]interface{})
+
+	var mainDBMap = make([]interface{}, 0)
+	var mainDBInsMap = make([]interface{}, 0)
+	var mainDBPGMap = make([]interface{}, 0)
+	var mainDBBackupMap = make([]interface{}, 0)
+	var mainDBSnapshotMap = make([]interface{}, 0)
 
 	dc.commonClient.SetCustomerIDForRest(consumerDetails.ApplicationCustomerID)
 
@@ -120,10 +127,7 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 		return
 	}
 
-	// authHeader := "eyJhbGciOiJSUzI1NiIsImtpZCI6IlZ5WXdidVRLZnhwanhHbVVXUmtVbnZ1NU5xdyIsInBpLmF0bSI6IjFmN28ifQ.eyJzY29wZSI6Im9wZW5pZCBwcm9maWxlIGVtYWlsIiwiY2xpZW50X2lkIjoiZGFmZDdmOWYtN2NhYy00MjBhLWI5MTAtZmQyYjc4NDZmZmU0IiwiaXNzIjoiaHR0cHM6Ly9kZXYtc3NvLmNjcy5hcnViYXRoZW5hLmNvbSIsImF1ZCI6ImF1ZCIsImxhc3ROYW1lIjoiaHBlIiwic3ViIjoiaHBlLmF1dGgudGVzdEBnbWFpbC5jb20iLCJ1c2VyX2N0eCI6Ijg5MjJhZmE2NzIzMDExZWJiZTAxY2EzMmQzMmI2Yjc3IiwiYXV0aF9zb3VyY2UiOiJwMTRjIiwiZ2l2ZW5OYW1lIjoiYXV0aHoiLCJpYXQiOjE2MTU5MTAzOTksImV4cCI6MTYxNTkxNzU5OX0.jLniCfT7DbPsZpzVBuYKrUvQ02VFEYhtULAd4NmT1ohPtiy3ybhY1oEjG6GsxMeOvD-6wMNokZqae3Zrt4BJrlENm0G00TF-jcbsKGkRHfqRxdpjS5yifOCySIwykcierd_32O0saTkNKj1FP56NzVKoRa8REdfgHawaFjsMhQ9nwDvftTwiANQqWF9tu1icIFjAuXJV5SVeOKf05ypnYLPtaMn5feTmxbteJh6fhsDx2y9SHDFgx6N8TkIDTu6yTKIFvNo85MdvDnzCFRNj6zzbCGIHPyjiL0hBuXyXQlI9j5FMjC2m7JICM2PSyR1BGD7Y7IULAlf_kaIMST4UNQ"
-
 	pKey := ConstructS3Object()
-
 	virtualmachines, vErr := dc.commonClient.GetVMs(ctx, authHeader)
 	if vErr != nil {
 		log.WithContext(ctx).Errorf("GetVMs request failed : %v", vErr)
@@ -154,7 +158,7 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 			handlers.SetNested(mainErrorMap, "VMBackups", virtualmachines[v].ID, vmbkpErr.Error())
 		}
 		for vb := range vmbackups {
-			mainVMBackupMap[virtualmachines[v].ID] = append(mainVMBackupMap[virtualmachines[v].ID], vmbackups[vb])
+			mainVMBackupMap = append(mainVMBackupMap, vmbackups[vb])
 		}
 	}
 	bkup, err := json.Marshal(mainVMBackupMap)
@@ -219,7 +223,8 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 			handlers.SetNested(mainErrorMap, "DatastoreBackups", datastores[d].ID, dsbkpErr.Error())
 		}
 		for db := range dsbackups {
-			mainDSBackupMap[datastores[d].ID] = append(mainDSBackupMap[datastores[d].ID], dsbackups[db])
+			//mainDSBackupMap[datastores[d].ID] = append(mainDSBackupMap[datastores[d].ID], dsbackups[db])
+			mainDSBackupMap = append(mainDSBackupMap, dsbackups[db])
 		}
 	}
 	u, err := json.Marshal(mainDSBackupMap)
@@ -228,6 +233,7 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 	}
 	err = os.WriteFile("./datastoreBKTest", u, 0644)
 	log.WithContext(ctx).Errorf("file write err is %v", err)
+
 	key, filesize, err = UploadToS3(ctx, &u, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
 		configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/DSBK/"+pKey))
 	log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
@@ -254,6 +260,30 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 	log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 
 	datastores = nil
+
+	dataOrchestrators, dErr := dc.commonClient.GetDOs(ctx, authHeader)
+	if dErr != nil {
+		log.WithContext(ctx).Errorf("GetDos request failed : %v", dErr)
+		handlers.SetNested(mainErrorMap, "DataOrchestrators", "DataOrchestrators", dErr.Error())
+	}
+
+	if dataOrchestrators != nil {
+		log.WithContext(ctx).Infof("DataOrchestrators count - %v", len(dataOrchestrators))
+		for p := range dataOrchestrators {
+			mainDataOrchestratorMap = append(mainDataOrchestratorMap, dataOrchestrators[p])
+		}
+		pp, err := json.Marshal(mainDataOrchestratorMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./doTest", pp, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &pp, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/DO/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
+		dataOrchestrators = nil
+	}
+
 	protectionpolicies, pErr := dc.commonClient.GetProtectionPolicies(ctx, authHeader)
 	if pErr != nil {
 		log.WithContext(ctx).Errorf("GetProtectionPolicies request failed : %v", pErr)
@@ -485,6 +515,115 @@ func (dc *dataCollectionService) CollectDeviceInformation(ctx context.Context, c
 			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/ACC/"+pKey))
 		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
 		cspa = nil
+	}
+	
+	dbs, dbErr := dc.commonClient.GetMsSqlDB(ctx, authHeader)
+	if dbErr != nil {
+		log.WithContext(ctx).Errorf("GetDbs request failed : %v", dbErr)
+		handlers.SetNested(mainErrorMap, "MssqlDB", "MssqlDB", dbErr.Error())
+	}
+
+	if dbs != nil {
+		log.WithContext(ctx).Infof("Databases count - %v", len(dbs))
+		for p := range dbs {
+			mainDBMap = append(mainDBMap, dbs[p])
+		}
+		pp, err := json.Marshal(mainDBMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./dbTest", pp, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &pp, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/MSSQL-DB/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
+	}
+
+	for v := range dbs {
+		dbbackups, dbbkpErr := dc.commonClient.GetDBBackups(ctx, dbs[v].ID, authHeader)
+		if dbbkpErr != nil {
+			log.WithContext(ctx).Errorf("GetDBBackups request failed - %v : %v",
+				dbs[v].ID, dbbkpErr.Error())
+			handlers.SetNested(mainErrorMap, "MssqlBackups", dbs[v].ID, dbbkpErr.Error())
+		}
+		for i := range dbbackups {
+			mainDBBackupMap = append(mainDBBackupMap, dbbackups[i])
+		}
+	}
+	dbbkup, err := json.Marshal(mainDBBackupMap)
+	if err != nil {
+		log.WithContext(ctx).Errorf("err is %v", err)
+	}
+	err = os.WriteFile("./dbBackups", dbbkup, 0644)
+	log.WithContext(ctx).Errorf("file write err is %v", err)
+
+	key, filesize, err = UploadToS3(ctx, &dbbkup, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+		configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/MSSQL-BK/"+pKey))
+	log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
+	for v := range dbs {
+		dbSnapshots, dbsnapErr := dc.commonClient.GetDBSnapshots(ctx, dbs[v].ID, authHeader)
+		if dbsnapErr != nil {
+			log.WithContext(ctx).Errorf("GetDBSnapshots request failed - %v : %v",
+				dbs[v].ID, dbsnapErr.Error())
+			handlers.SetNested(mainErrorMap, "MssqlSnapshots", dbs[v].ID, dbsnapErr.Error())
+		}
+		for i := range dbSnapshots {
+			mainDBSnapshotMap = append(mainDBSnapshotMap, dbSnapshots[i])
+		}
+	}
+	dbsnap, err := json.Marshal(mainDBSnapshotMap)
+	if err != nil {
+		log.WithContext(ctx).Errorf("err is %v", err)
+	}
+	err = os.WriteFile("./dbSnapshots", dbsnap, 0644)
+	log.WithContext(ctx).Errorf("file write err is %v", err)
+	key, filesize, err = UploadToS3(ctx, &dbsnap, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+		configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/MSSQL-SNP/"+pKey))
+	dbs = nil
+
+	dbIns, dbErr := dc.commonClient.GetMsSqlInstances(ctx, authHeader)
+	if dbErr != nil {
+		log.WithContext(ctx).Errorf("GetDos request failed : %v", dbErr)
+		handlers.SetNested(mainErrorMap, "MssqlInstances", "MssqlInstances", dbErr.Error())
+	}
+
+	if dbIns != nil {
+		log.WithContext(ctx).Infof("Databases count - %v", len(dbIns))
+		for p := range dbIns {
+			mainDBInsMap = append(mainDBInsMap, dbIns[p])
+		}
+		pp, err := json.Marshal(mainDBInsMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./dbInsTest", pp, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &pp, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/MSSQL-DBINS/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
+		dbIns = nil
+	}
+	dbPG, dbErr := dc.commonClient.GetMsSqlProtectionGroups(ctx, authHeader)
+	if dbErr != nil {
+		log.WithContext(ctx).Errorf("GetDB PGs request failed : %v", dbErr)
+		handlers.SetNested(mainErrorMap, "MssqlProtectionGroups", "MssqlProtectionGroups", dbErr.Error())
+	}
+
+	if dbPG != nil {
+		log.WithContext(ctx).Infof("Databases count - %v", len(dbPG))
+		for p := range dbPG {
+			mainDBPGMap = append(mainDBPGMap, dbPG[p])
+		}
+		pp, err := json.Marshal(mainDBPGMap)
+		if err != nil {
+			log.WithContext(ctx).Errorf("err is %v", err)
+		}
+		err = os.WriteFile("./dbPGTest", pp, 0644)
+		log.WithContext(ctx).Errorf("file write err is %v", err)
+		key, filesize, err := UploadToS3(ctx, &pp, configs.GetAWSS3BucketName(), configs.GetAWSRegion(),
+			configs.GetAWSAccessKey(), configs.GetAWSSecretAccessKey(), UploadType(configs.GetSourceType()+"/MSSQL-DBPG/"+pKey))
+		log.WithContext(ctx).Infof("Err = %v, key= %v, filesize = %v", err, key, filesize)
+		dbPG = nil
 	}
 
 }
